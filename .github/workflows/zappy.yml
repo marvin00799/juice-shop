@@ -20,28 +20,36 @@ jobs:
           sleep 30    # Wait for app to start
           curl -f http://localhost:3000 || exit 1
 
-      # 2. Run ZAP Scan using updated action
+      # 2. Run ZAP Scan using direct Docker command
       - name: Run ZAP Baseline Scan
-        uses: zaproxy/action-full-scan@v0.3.0  # Updated action version
-        with:
-          target: 'http://localhost:3000'
-          docker_image: 'ghcr.io/zaproxy/zaproxy:stable'  # Official image
-          cmd_options: '-d'
-          rules_file: ''  # Skip custom rules file
+        run: |
+          docker pull ghcr.io/zaproxy/zaproxy:stable
+          docker run --rm \
+            --network host \
+            -v $(pwd):/zap/wrk \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py \
+            -t http://localhost:3000 \
+            -r zap-report.html \
+            -x zap-report.xml \
+            -J zap-report.json \
+            -d
 
-      # 3. Upload reports (now uses default output names)
+      # 3. Upload reports
       - name: Upload Security Reports
         uses: actions/upload-artifact@v4
         with:
           name: zap-reports
           path: |
-            zap-results.*
+            zap-report.html
+            zap-report.xml
+            zap-report.json
           retention-days: 3
 
-      # 4. Simplified results check
+      # 4. Check results
       - name: Check Results
         run: |
-          if [ -f zap-results.xml ] && grep -q "High" zap-results.xml; then
+          if [ -f zap-report.xml ] && grep -q "<riskcode>3" zap-report.xml; then
             echo "::error::High risk vulnerabilities detected!"
             exit 1
           fi
