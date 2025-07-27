@@ -1,4 +1,4 @@
-name: OWASP ZAP Security Scan
+name: OWASP ZAP Security Scan with PDF Reports
 
 on:
   push:
@@ -10,9 +10,16 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
+      # 1. Checkout the code
       - uses: actions/checkout@v4
 
-      # 1. Start your application (Node.js example)
+      # 2. Install required tools
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wkhtmltopdf
+
+      # 3. Start your application (Node.js example)
       - name: Start Application
         run: |
           npm install
@@ -20,13 +27,19 @@ jobs:
           sleep 30    # Wait for app to start
           curl -f http://localhost:3000 || exit 1
 
-      # 2. Run ZAP Scan using direct Docker command
+      # 4. Create directory for reports with correct permissions
+      - name: Prepare reports directory
+        run: |
+          mkdir -p reports
+          chmod 777 reports
+
+      # 5. Run ZAP Baseline Scan with explicit output directory
       - name: Run ZAP Baseline Scan
         run: |
           docker pull ghcr.io/zaproxy/zaproxy:stable
           docker run --rm \
             --network host \
-            -v $(pwd):/zap/wrk \
+            -v $(pwd)/reports:/zap/wrk \
             ghcr.io/zaproxy/zaproxy:stable \
             zap-baseline.py \
             -t http://localhost:3000 \
@@ -35,21 +48,28 @@ jobs:
             -J zap-report.json \
             -d
 
-      # 3. Upload reports
+      # 6. Generate PDF report
+      - name: Create PDF Report
+        run: |
+          wkhtmltopdf --enable-local-file-access \
+            file://$(pwd)/reports/zap-report.html \
+            reports/zap-report.pdf
+
+      # 7. Upload all reports
       - name: Upload Security Reports
         uses: actions/upload-artifact@v4
         with:
-          name: zap-reports
+          name: security-reports
           path: |
-            zap-report.html
-            zap-report.xml
-            zap-report.json
-          retention-days: 3
+            reports/zap-report.html
+            reports/zap-report.pdf
+            reports/zap-report.json
+          retention-days: 7
 
-      # 4. Check results
+      # 8. Check results
       - name: Check Results
         run: |
-          if [ -f zap-report.xml ] && grep -q "<riskcode>3" zap-report.xml; then
+          if [ -f reports/zap-report.xml ] && grep -q "<riskcode>3" reports/zap-report.xml; then
             echo "::error::High risk vulnerabilities detected!"
             exit 1
           fi
