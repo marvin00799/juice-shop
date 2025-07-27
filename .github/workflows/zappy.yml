@@ -1,0 +1,53 @@
+name: OWASP ZAP Security Scan
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  security_scan:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      # 1. Start your application (modify for your tech stack)
+      - name: Start Application
+        run: |
+          # Example for Node.js apps:
+          npm install
+          npm run start &  # Run in background
+          sleep 30        # Wait for app to start
+          
+          # For Python apps use:
+          # python -m http.server 8000 &
+          # sleep 10
+          
+          # Verify app is running
+          curl -f http://localhost:3000 || exit 1
+
+      # 2. Run ZAP Scan against localhost
+      - name: Run ZAP Baseline Scan
+        uses: zaproxy/action-baseline@v0.6.0  # Official ZAP Action
+        with:
+          target: 'http://localhost:3000'     # Match your app's port
+          rules_file_name: "zap-rules.tsv"
+          cmd_options: "-d"                  # Daemon mode
+
+      # 3. Upload reports
+      - name: Upload Security Reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-reports
+          path: |
+            zap-results.*
+          retention-days: 3
+
+      # 4. Fail if high-risk vulnerabilities found
+      - name: Check Results
+        run: |
+          if grep -q "High" zap-results.xml; then
+            echo "::error::High risk vulnerabilities detected!"
+            exit 1
+          fi
