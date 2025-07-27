@@ -12,30 +12,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 1. Start your application (modify for your tech stack)
+      # 1. Start your application (Node.js example)
       - name: Start Application
         run: |
-          # Example for Node.js apps:
           npm install
-          npm run start &  # Run in background
-          sleep 30        # Wait for app to start
-          
-          # For Python apps use:
-          # python -m http.server 8000 &
-          # sleep 10
-          
-          # Verify app is running
+          npm start &  # Run in background
+          sleep 30    # Wait for app to start
           curl -f http://localhost:3000 || exit 1
 
-      # 2. Run ZAP Scan against localhost
+      # 2. Run ZAP Scan using updated action
       - name: Run ZAP Baseline Scan
-        uses: zaproxy/action-baseline@v0.6.0  # Official ZAP Action
+        uses: zaproxy/action-full-scan@v0.3.0  # Updated action version
         with:
-          target: 'http://localhost:3000'     # Match your app's port
-          rules_file_name: "zap-rules.tsv"
-          cmd_options: "-d"                  # Daemon mode
+          target: 'http://localhost:3000'
+          docker_image: 'ghcr.io/zaproxy/zaproxy:stable'  # Official image
+          cmd_options: '-d'
+          rules_file: ''  # Skip custom rules file
 
-      # 3. Upload reports
+      # 3. Upload reports (now uses default output names)
       - name: Upload Security Reports
         uses: actions/upload-artifact@v4
         with:
@@ -44,10 +38,10 @@ jobs:
             zap-results.*
           retention-days: 3
 
-      # 4. Fail if high-risk vulnerabilities found
+      # 4. Simplified results check
       - name: Check Results
         run: |
-          if grep -q "High" zap-results.xml; then
+          if [ -f zap-results.xml ] && grep -q "High" zap-results.xml; then
             echo "::error::High risk vulnerabilities detected!"
             exit 1
           fi
