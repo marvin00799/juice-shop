@@ -12,13 +12,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 1. Install required tools
-      - name: Install dependencies
+      # 1. Install PDF converter
+      - name: Install wkhtmltopdf
         run: |
           sudo apt-get update
           sudo apt-get install -y wkhtmltopdf
 
-      # 2. Start your application
+      # 2. Start your application (Node.js example)
       - name: Start Application
         run: |
           npm install
@@ -26,47 +26,37 @@ jobs:
           sleep 30    # Wait for app to start
           curl -f http://localhost:3000 || exit 1
 
-      # 3. Create reports directory with proper permissions
-      - name: Prepare workspace
+      # 3. Create reports directory
+      - name: Prepare reports folder
         run: |
           mkdir -p reports
-          chmod 777 reports  # Ensure ZAP can write
+          chmod 777 reports  # Ensure write permissions
 
-      # 4. Run ZAP Scan with fixed permissions
-      - name: Run ZAP Baseline Scan
+      # 4. Run ZAP Scan (HTML report only)
+      - name: Run ZAP Scan
         run: |
           docker run --rm \
             -v $(pwd)/reports:/zap/wrk \
-            -u $(id -u):$(id -g) \  # Proper user permissions
+            -u $(id -u):$(id -g) \
             ghcr.io/zaproxy/zaproxy:stable \
             zap-baseline.py \
             -t http://localhost:3000 \
             -r /zap/wrk/zap-report.html \
-            -x /zap/wrk/zap-report.xml \
-            -J /zap/wrk/zap-report.json \
             -d
 
-      # 5. Generate PDF report
-      - name: Create PDF Report
+      # 5. Convert HTML to PDF
+      - name: Generate PDF Report
         run: |
           wkhtmltopdf --enable-local-file-access \
             file://$(pwd)/reports/zap-report.html \
             reports/zap-report.pdf
 
-      # 6. Upload all reports
-      - name: Upload Security Reports
+      # 6. Upload both reports
+      - name: Upload Reports
         uses: actions/upload-artifact@v4
         with:
           name: security-reports
           path: |
             reports/zap-report.html
             reports/zap-report.pdf
-            reports/zap-report.json
           retention-days: 7
-
-      # 7. Create direct download links
-      - name: Generate Report Links
-        run: |
-          echo "### Security Scan Results" >> $GITHUB_STEP_SUMMARY
-          echo "- [HTML Report](https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts/security-reports)" >> $GITHUB_STEP_SUMMARY
-          echo "- [PDF Report](https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts/security-reports)" >> $GITHUB_STEP_SUMMARY
