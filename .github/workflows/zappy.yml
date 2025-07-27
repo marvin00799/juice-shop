@@ -8,7 +8,7 @@ on:
 jobs:
   security_scan:
     runs-on: ubuntu-latest
-    
+
     steps:
       - uses: actions/checkout@v4
 
@@ -32,7 +32,7 @@ jobs:
           mkdir -p reports
           chmod 777 reports  # Ensure write permissions
 
-      # 4. Run ZAP Scan (HTML report only)
+      # 4. Run ZAP Scan (HTML and YAML reports)
       - name: Run ZAP Scan
         run: |
           docker run --rm \
@@ -42,6 +42,7 @@ jobs:
             zap-baseline.py \
             -t http://localhost:3000 \
             -r /zap/wrk/zap-report.html \
+            -o /zap/wrk/zap.yaml \
             -d
 
       # 5. Convert HTML to PDF
@@ -51,7 +52,7 @@ jobs:
             file://$(pwd)/reports/zap-report.html \
             reports/zap-report.pdf
 
-      # 6. Upload both reports
+      # 6. Upload all reports
       - name: Upload Reports
         uses: actions/upload-artifact@v4
         with:
@@ -59,4 +60,5 @@ jobs:
           path: |
             reports/zap-report.html
             reports/zap-report.pdf
+            reports/zap.yaml
           retention-days: 7
