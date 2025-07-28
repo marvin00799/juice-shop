@@ -24,6 +24,7 @@ jobs:
       - name: Run ZAP Scan
         run: |
           docker run --rm \
+            --network host \
             -v $(pwd):/zap/wrk \
             ghcr.io/zaproxy/zaproxy:stable \
             zap-baseline.py \
