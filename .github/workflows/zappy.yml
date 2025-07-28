@@ -1,4 +1,4 @@
-name: OWASP ZAP HTML Report
+name: OWASP ZAP Scan and Summary Report
 
 on:
   push:
@@ -6,13 +6,13 @@ on:
   workflow_dispatch:
 
 jobs:
-  security_scan:
+  zap_scan:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
 
-      # 1. Start your application (Node.js example)
+      # Step 1: Start your application
       - name: Start Application
         run: |
           npm install
@@ -20,8 +20,8 @@ jobs:
           sleep 30
           curl -f http://localhost:3000 || exit 1
 
-      # 2. Run ZAP and generate HTML report
-      - name: Run ZAP Scan
+      # Step 2: Run ZAP baseline scan and output HTML & JSON reports
+      - name: Run ZAP Baseline Scan
         run: |
           docker run --rm \
             --network host \
@@ -29,11 +29,26 @@ jobs:
             ghcr.io/zaproxy/zaproxy:stable \
             zap-baseline.py \
             -t http://localhost:3000 \
-            -r /zap/wrk/zap-report.html
+            -r /zap/wrk/zap-report.html \
+            -J /zap/wrk/zap-report.json
 
-      # 3. Upload HTML report
-      - name: Upload Report
+      # Step 3: Display summary table from JSON report
+      - name: Display Vulnerability Summary Table
+        run: |
+          echo "| Severity | Count |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          jq -r '
+            .site[0].alerts[] |
+            .riskdesc | split(" ")[0]
+          ' zap-report.json | sort | uniq -c | awk '
+            { printf("| %-8s | %-5s |\n", $2, $1) }
+          ' >> $GITHUB_STEP_SUMMARY
+
+      # Step 4: Upload reports as artifacts
+      - name: Upload ZAP Reports
         uses: actions/upload-artifact@v4
         with:
-          name: vulnerability-report
-          path: zap-report.html
+          name: zap-scan-reports
+          path: |
+            zap-report.html
+            zap-report.json
