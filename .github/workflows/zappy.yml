@@ -32,7 +32,7 @@ jobs:
             -r /zap/wrk/zap-report.html \
             -J /zap/wrk/zap-report.json
 
-      # Step 3: Display summary table from JSON report
+      # Step 3: Display vulnerability summary table in job output
       - name: Display Vulnerability Summary Table
         run: |
           echo "| Severity | Count |" >> $GITHUB_STEP_SUMMARY
